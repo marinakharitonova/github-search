@@ -47,6 +47,10 @@ export default RepositoryPage;
 
 const PageH1 = styled(H1)`
   margin-bottom: 36px;
+  
+  @media (max-width: 768px) {
+    margin-bottom: 16px;
+  }
 `
 
 const Label = styled.span`

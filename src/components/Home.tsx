@@ -1,19 +1,52 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useGetUsersRepositoriesQuery, useSearchRepositoriesQuery} from "../features/apiSlice";
 import RepositoriesList from "./RepositoriesList";
 import {IRepository} from "../types/IRepository";
 import {IRepositoryExtended} from "../types/IRepositoryExtended";
 import styled from "styled-components";
 import ContentLoader from "./ContentLoader";
+import Pagination from "./Pagination";
+import {useSearchParams} from "react-router-dom";
 
 const CURRENT_USER_LOGIN = 'marinakharitonova'
+const PER_PAGE = 10
+const MIN_QUERY_LENGTH = 3
 
 
 function Home() {
-    const [page, setPage] = useState(1)
-    const [query, setQuery] = useState('')
+    let [searchParams, setSearchParams] = useSearchParams();
+    const searchPage = Number(searchParams.get('page')) || 1
+    const searchQuery = searchParams.get('query') || ''
+
+    const [page, setPage] = useState(searchPage)
+    const [query, setQuery] = useState(searchQuery)
+
+    useEffect(() => {
+        if (page !== searchPage) {
+            setPage(searchPage)
+        }
+    }, [searchPage, page])
+
+    useEffect(() => {
+        if (query.length >= MIN_QUERY_LENGTH && query !== searchQuery) {
+            setQuery(searchQuery)
+        }
+    }, [query, searchQuery])
+
+
     const handlePageChange = (page: number) => {
         setPage(page)
+        setSearchParams({page: page.toString(), query})
+    }
+    const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const query = e.target.value
+        setQuery(query)
+        setPage(1)
+        if (query.length >= 3) {
+            setSearchParams({page: 1..toString(), query})
+        } else {
+            setSearchParams({})
+        }
     }
 
     const {
@@ -25,29 +58,37 @@ function Home() {
     } = useSearchRepositoriesQuery({
         q: `${query} in:name`,
         page,
-        perPage: 10
-    }, {skip: query.length < 3})
+        perPage: PER_PAGE
+    }, {skip: query.length < MIN_QUERY_LENGTH})
 
     const {
         data: currentRepositories,
         isLoading: isCurrentRepositoriesLoading,
         isSuccess: isCurrentRepositoriesSuccess,
         isError: isCurrentRepositoriesError
-    } = useGetUsersRepositoriesQuery(CURRENT_USER_LOGIN, {skip: query.length >= 1})
+    } = useGetUsersRepositoriesQuery(CURRENT_USER_LOGIN, {skip: query.length >= MIN_QUERY_LENGTH})
 
     let repositories: IRepository[] | IRepositoryExtended[] = []
-    if (query.length >= 3) {
-        if (searchResults && searchResults.items.length) repositories = searchResults.items
+    let totalCount = 0
+    if (query.length >= MIN_QUERY_LENGTH) {
+        if (searchResults && searchResults.items.length) {
+            repositories = searchResults.items
+            totalCount = searchResults.total_count
+        }
     } else {
-        if (currentRepositories) repositories = currentRepositories
+        if (currentRepositories) {
+            repositories = currentRepositories
+            totalCount = repositories.length
+        }
     }
+
 
     return (
         <div>
             <Input type="text"
                    value={query}
-                   placeholder="Input the name of the repository"
-                   onChange={(e) => setQuery(e.target.value)}/>
+                   placeholder="Input the name of the repository (at least 3 characters)"
+                   onChange={handleQueryChange}/>
 
 
             <ContentLoader isLoading={isSearchResultsLoading || isCurrentRepositoriesLoading}
@@ -55,10 +96,19 @@ function Home() {
                            isSuccess={isSearchSuccess || isCurrentRepositoriesSuccess}
             >
                 <Content isFetching={isFetching}>
-                    {repositories.length > 0 && <RepositoriesList repositories={repositories}/>}
+                    {repositories.length > 0 &&
+                        <>
+                            <RepositoriesList repositories={repositories}/>
+
+                            {totalCount > PER_PAGE &&
+                                <Pagination totalCount={totalCount} perPage={PER_PAGE} activePage={page}
+                                            handlePageChange={handlePageChange}/>}
+                        </>
+                    }
 
                     {repositories.length === 0 && <p>Nothing found</p>}
                 </Content>
+
 
             </ContentLoader>
         </div>
@@ -80,6 +130,10 @@ const Input = styled.input`
 
   &:focus {
     border-color: ${props => props.theme.palette.primary};
+  }
+
+  @media (max-width: 768px) {
+    margin-bottom: 12px;
   }
 `
 

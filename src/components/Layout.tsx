@@ -40,6 +40,10 @@ const StyledLayout = styled.div`
 const Content = styled.div`
   max-width: 1200px;
   margin: 0 auto;
+
+  @media (max-width: 768px) {
+    padding: 0 16px;
+  }
 `
 
 const Wrapper = styled.div`
